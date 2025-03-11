@@ -4,58 +4,73 @@
   <title>Expense Analyzer</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
   <style>
     body {
         background: url('https://picsum.photos/id/7/4728/3168') no-repeat center center fixed;
         background-size: cover;
-        color: #f8f9fa; /* Lighter color for better contrast */
+        color: #f8f9fa;
         min-height: 100vh;
         text-align: center;
+        font-family: 'Poppins', sans-serif;
     }
     .container {
-        background-color: rgba(0, 0, 0, 0.85); /* Slightly lighter background */
-        padding: 20px;
+        background-color: rgba(0, 0, 0, 0.85);
+        padding: 25px;
         border-radius: 15px;
-        color: #ffffff; /* Bright white text */
+        color: #ffffff;
         margin-top: 50px;
+        box-shadow: 0 4px 10px rgba(255, 255, 255, 0.2);
     }
     /* Improve chart text readability */
     canvas {
-        background-color: rgba(255, 255, 255, 0.9); /* Light background for better contrast */
+        background-color: rgba(255, 255, 255, 0.9);
         border-radius: 10px;
     }
     /* Chart titles */
     h4 {
-        color: #f1c40f; /* Yellow text for visibility */
+        color: #00d4ff;
         font-weight: bold;
     }
-    /* Adjust text size */
+    /* Adjust text size & layout */
     .chart-container, .wide-chart {
-        max-width: 50%;
+        max-width: 60%;
         margin: auto;
-        font-size: 16px; /* Increase text size */
+        font-size: 16px;
+    }
+    .btn-custom {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        transition: transform 0.3s, box-shadow 0.3s;
+        color: white;
+    }
+    .btn-custom:hover {
+        transform: translateY(-2px);
+        box-shadow: 0px 5px 15px rgba(0, 123, 255, 0.4);
     }
   </style>
 </head>
 <body>
 <div class="container">
-  <h1>Expense Analysis</h1>
-  <a href="/expenses" class="btn btn-secondary mb-3">Back to Expenses</a>
+  <h1 class="mb-4"><i class="fa-solid fa-chart-line"></i> Expense Analysis</h1>
+  <a href="/expenses" class="btn btn-secondary mb-3"><i class="fa-solid fa-arrow-left"></i> Back to Expenses</a>
 
   <!-- Category-wise Expenses (Pie Chart) -->
-  <h4>Category-wise Spending</h4>
+  <h4><i class="fa-solid fa-chart-pie"></i> Category-wise Spending</h4>
   <div class="chart-container">
     <canvas id="categoryChart"></canvas>
   </div>
 
   <!-- Monthly Expenses (Bar Chart) -->
-  <h4 class="mt-4">Monthly Expense Trends</h4>
+  <h4 class="mt-4"><i class="fa-solid fa-chart-bar"></i> Monthly Expense Trends</h4>
   <div class="wide-chart">
     <canvas id="monthlyChart"></canvas>
   </div>
 
   <!-- Individual Expense Names (Horizontal Bar Chart) -->
-  <h4 class="mt-4">Expense-wise Breakdown</h4>
+  <h4 class="mt-4"><i class="fa-solid fa-list"></i> Expense-wise Breakdown</h4>
   <div class="wide-chart">
     <canvas id="expenseChart"></canvas>
   </div>
@@ -65,7 +80,7 @@
   fetch('/expenses/chart-data')
       .then(response => response.json())
       .then(data => {
-          // Category-wise Pie Chart (Smaller size)
+          // Category-wise Pie Chart
           new Chart(document.getElementById('categoryChart'), {
               type: 'pie',
               data: {
@@ -75,10 +90,14 @@
                       data: data.categoryData,
                       backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4CAF50', '#FF9800']
                   }]
+              },
+              options: {
+                  responsive: true,
+                  maintainAspectRatio: false
               }
           });
 
-          // Monthly Expenses Bar Chart (Smaller size)
+          // Monthly Expenses Bar Chart
           new Chart(document.getElementById('monthlyChart'), {
               type: 'bar',
               data: {
@@ -88,10 +107,14 @@
                       data: data.monthData,
                       backgroundColor: '#36A2EB'
                   }]
+              },
+              options: {
+                  responsive: true,
+                  maintainAspectRatio: false
               }
           });
 
-          // Expense Names Bar Chart (Smaller size)
+          // Expense Names Bar Chart
           new Chart(document.getElementById('expenseChart'), {
               type: 'bar',
               data: {
@@ -103,7 +126,9 @@
                   }]
               },
               options: {
-                  indexAxis: 'y' // Horizontal bar chart
+                  indexAxis: 'y',
+                  responsive: true,
+                  maintainAspectRatio: false
               }
           });
       })
