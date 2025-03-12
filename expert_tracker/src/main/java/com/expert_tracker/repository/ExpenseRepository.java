@@ -30,4 +30,16 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     @Query("SELECT e FROM Expense e WHERE e.user = :user AND YEAR(e.date) = :year")
     List<Expense> findByUserAndYear(User user, int year);
+    @Query("SELECT e FROM Expense e WHERE e.user = :user AND YEAR(e.date) = :year AND MONTH(e.date) = :month AND e.category = :category")
+    List<Expense> findByUserAndYearAndMonthAndCategory(@Param("user") User user, @Param("year") int year, @Param("month") int month, @Param("category") String category);
+
+    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.user = :user AND YEAR(e.date) = :year AND MONTH(e.date) = :month AND e.category = :category")
+    double getTotalExpenseByMonthYearAndCategory(@Param("user") User user, @Param("year") int year, @Param("month") int month, @Param("category") String category);
+    @Query("SELECT e FROM Expense e WHERE e.user = :user AND YEAR(e.date) = :year AND e.category = :category")
+    List<Expense> findByUserAndYearAndCategory(@Param("user") User user, @Param("year") int year, @Param("category") String category);
+
+    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.user = :user AND YEAR(e.date) = :year AND e.category = :category")
+    double getTotalExpenseByYearAndCategory(@Param("user") User user, @Param("year") int year, @Param("category") String category);
+
+
 }

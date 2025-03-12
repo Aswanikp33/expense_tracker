@@ -25,6 +25,7 @@ public class ExpenseService {
         return total != null ? total : 0.0;
     }
 
+
     public double getTotalExpenseByYear(User user, int year) {
         Double total = expenseRepository.getTotalExpenseByYear(user, year);
         return total != null ? total : 0.0;
@@ -91,6 +92,20 @@ public class ExpenseService {
         List<Expense> expenses = expenseRepository.findByUserAndYear(user, year);
         return expenses.stream()
                 .collect(Collectors.groupingBy(exp -> exp.getDate().getMonthValue(), Collectors.summingDouble(Expense::getAmount)));
+    }
+    public List<Expense> getExpensesByMonthYearAndCategory(User user, int year, int month, String category) {
+        return expenseRepository.findByUserAndYearAndMonthAndCategory(user, year, month, category);
+    }
+
+    public double getTotalExpenseByMonthYearAndCategory(User user, int year, int month, String category) {
+        return expenseRepository.getTotalExpenseByMonthYearAndCategory(user, year, month, category);
+    }
+    public List<Expense> getExpensesByYearAndCategory(User user, int year, String category) {
+        return expenseRepository.findByUserAndYearAndCategory(user, year, category);
+    }
+
+    public double getTotalExpenseByYearAndCategory(User user, int year, String category) {
+        return expenseRepository.getTotalExpenseByYearAndCategory(user, year, category);
     }
 
 }

@@ -31,7 +31,6 @@ public class ExpenseController {
         this.expenseService = expenseService;
         this.budgetService = budgetService;
     }
-
     @GetMapping
     public String listExpenses(@AuthenticationPrincipal User user, Model model) {
         List<Expense> expenses = expenseService.getUserExpenses(user);
@@ -46,8 +45,9 @@ public class ExpenseController {
         double monthlyBudget = budget != null ? budget.getMonthlyBudget() : 0.0;
         double yearlyBudget = budget != null ? budget.getYearlyBudget() : 0.0;
 
-        boolean monthlyWarning = monthlyTotal > (monthlyBudget * 0.8);
-        boolean yearlyWarning = yearlyTotal > (yearlyBudget * 0.8);
+        // ✅ Show warning only when expenses exceed the budget (not at 80%)
+        boolean monthlyWarning = monthlyBudget > 0 && monthlyTotal >= monthlyBudget;
+        boolean yearlyWarning = yearlyBudget > 0 && yearlyTotal >= yearlyBudget;
 
         model.addAttribute("expenses", expenses);
         model.addAttribute("monthlyTotal", monthlyTotal);
@@ -69,37 +69,64 @@ public class ExpenseController {
         List<Expense> filteredExpenses = new ArrayList<>();
         double totalExpense = 0.0;
 
-        // If filtering by month, ensure year is provided; otherwise, return an error message
-        if (month != null && (year == null || year == 0)) {
-            model.addAttribute("errorMessage", "Please select a year when filtering by month.");
-            model.addAttribute("filteredExpenses", new ArrayList<>());
-            return "filtered-expenses";
-        }
+        // Ensure current monthly and yearly totals are always available
+        int currentYear = LocalDate.now().getYear();
+        int currentMonth = LocalDate.now().getMonthValue();
+        double currentMonthlyTotal = expenseService.getTotalExpenseByMonthAndYear(user, currentYear, currentMonth);
+        double currentYearlyTotal = expenseService.getTotalExpenseByYear(user, currentYear);
 
-        if (year != null && month != null) {
-            // Filter by both year and month
+        // Set default values for filtered totals
+        double filteredMonthlyTotal = 0.0;
+        double filteredYearlyTotal = 0.0;
+
+        if (year != null && month != null && category != null && !category.isEmpty()) {
+            filteredExpenses = expenseService.getExpensesByMonthYearAndCategory(user, year, month, category);
+            totalExpense = expenseService.getTotalExpenseByMonthYearAndCategory(user, year, month, category);
+            filteredMonthlyTotal = totalExpense;
+            filteredYearlyTotal = expenseService.getTotalExpenseByYear(user, year);
+        } else if (year != null && month != null) {
             filteredExpenses = expenseService.getExpensesByMonthAndYear(user, year, month);
             totalExpense = expenseService.getTotalExpenseByMonthAndYear(user, year, month);
+            filteredMonthlyTotal = totalExpense;
+            filteredYearlyTotal = expenseService.getTotalExpenseByYear(user, year);
         } else if (year != null) {
-            // Filter only by year
             filteredExpenses = expenseService.getUserExpensesByYear(user, year);
             totalExpense = expenseService.getTotalExpenseByYear(user, year);
+            filteredYearlyTotal = totalExpense;
+            filteredMonthlyTotal = expenseService.getTotalExpenseByMonthAndYear(user, year, currentMonth);
         } else if (category != null && !category.isEmpty()) {
-            // Filter only by category (year and month are NOT required)
             filteredExpenses = expenseService.getExpensesByCategory(user, category);
             totalExpense = expenseService.getTotalExpenseByCategory(user, category);
+            filteredYearlyTotal = expenseService.getTotalExpenseByYear(user, currentYear);
+            filteredMonthlyTotal = expenseService.getTotalExpenseByMonthAndYear(user, currentYear, currentMonth);
         } else {
-            // Default: Show all expenses
             filteredExpenses = expenseService.getUserExpenses(user);
         }
 
+        // Ensure the budget is included in the filtering
+        Budget budget = budgetService.getBudgetForUser(user);
+        double monthlyBudget = budget != null ? budget.getMonthlyBudget() : 0.0;
+        double yearlyBudget = budget != null ? budget.getYearlyBudget() : 0.0;
+
+        // ✅ Correctly calculate warnings
+        // Ensure warning calculations are based on the correct values
+        boolean monthlyWarning = monthlyBudget > 0 && (filteredMonthlyTotal > 0 ? filteredMonthlyTotal : currentMonthlyTotal) >= monthlyBudget;
+        boolean yearlyWarning = yearlyBudget > 0 && (filteredYearlyTotal > 0 ? filteredYearlyTotal : currentYearlyTotal) >= yearlyBudget;
+
+
         model.addAttribute("filteredExpenses", filteredExpenses);
         model.addAttribute("totalExpense", totalExpense);
+        model.addAttribute("monthlyTotal", filteredMonthlyTotal > 0 ? filteredMonthlyTotal : currentMonthlyTotal);
+        model.addAttribute("yearlyTotal", filteredYearlyTotal > 0 ? filteredYearlyTotal : currentYearlyTotal);
+        model.addAttribute("monthlyBudget", monthlyBudget);
+        model.addAttribute("yearlyBudget", yearlyBudget);
+        model.addAttribute("monthlyWarning", monthlyWarning);
+        model.addAttribute("yearlyWarning", yearlyWarning);
         model.addAttribute("selectedYear", year);
         model.addAttribute("selectedMonth", month);
         model.addAttribute("selectedCategory", category);
 
-        return "filtered-expenses";
+        return "expenses";
     }
 
     @GetMapping("/add")
@@ -122,25 +149,47 @@ public class ExpenseController {
         expenseService.addExpense(expense);
         return "redirect:/expenses";
     }
-
     @GetMapping("/edit")
     public String showEditExpenseForm(@RequestParam Long id, Model model) {
-        model.addAttribute("expense", expenseService.findExpenseById(id));
-        return "edit-expense";
+        Expense expense = expenseService.findExpenseById(id);
+        model.addAttribute("expense", expense);
+        return "edit-expense";  // Make sure this file exists in your templates folder
     }
 
     @PostMapping("/edit")
-    public String editExpense(@RequestParam Long id, @ModelAttribute Expense expense, 
-                          Principal principal, RedirectAttributes redirectAttributes) {
-    try {
-        String username = principal.getName();  // Get logged-in username
-        expenseService.updateExpense(id, expense, username);
-        redirectAttributes.addFlashAttribute("successMessage", "Expense updated successfully!");
-    } catch (RuntimeException e) {
-        redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+    public String editExpense(@RequestParam Long id, @ModelAttribute Expense expense,
+                              @AuthenticationPrincipal User user, RedirectAttributes redirectAttributes) {
+        try {
+            expenseService.updateExpense(id, expense, user.getUsername());
+
+            // ✅ Refresh budget calculations after update
+            LocalDate today = LocalDate.now();
+            int currentYear = today.getYear();
+            int currentMonth = today.getMonthValue();
+
+            double monthlyTotal = expenseService.getTotalExpenseByMonthAndYear(user, currentYear, currentMonth);
+            double yearlyTotal = expenseService.getTotalExpenseByYear(user, currentYear);
+
+            Budget budget = budgetService.getBudgetForUser(user);
+            double monthlyBudget = budget != null ? budget.getMonthlyBudget() : 0.0;
+            double yearlyBudget = budget != null ? budget.getYearlyBudget() : 0.0;
+
+            boolean monthlyWarning = monthlyBudget > 0 && monthlyTotal >= (monthlyBudget * 0.8);
+            boolean yearlyWarning = yearlyBudget > 0 && yearlyTotal >= (yearlyBudget * 0.8);
+
+            // ✅ Update values before redirecting
+            redirectAttributes.addFlashAttribute("monthlyTotal", monthlyTotal);
+            redirectAttributes.addFlashAttribute("yearlyTotal", yearlyTotal);
+            redirectAttributes.addFlashAttribute("monthlyWarning", monthlyWarning);
+            redirectAttributes.addFlashAttribute("yearlyWarning", yearlyWarning);
+
+            redirectAttributes.addFlashAttribute("successMessage", "Expense updated successfully!");
+        } catch (RuntimeException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        }
+        return "redirect:/expenses"; // ✅ Now the totals & warnings will be updated properly
     }
-    return "redirect:/expenses";
-}
+
 
     @GetMapping("/delete")
     public String deleteExpense(@RequestParam Long id, @AuthenticationPrincipal User user, 
