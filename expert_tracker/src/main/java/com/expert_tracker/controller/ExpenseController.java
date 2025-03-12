@@ -13,11 +13,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.security.Principal;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.YearMonth;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.format.TextStyle;
+import java.util.*;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
@@ -30,6 +29,10 @@ public class ExpenseController {
     public ExpenseController(ExpenseService expenseService, BudgetService budgetService) {
         this.expenseService = expenseService;
         this.budgetService = budgetService;
+    }
+
+    public String getMonthName(int month) {
+        return Month.of(month).getDisplayName(TextStyle.FULL, Locale.ENGLISH);
     }
     @GetMapping
     public String listExpenses(@AuthenticationPrincipal User user, Model model) {
@@ -59,7 +62,6 @@ public class ExpenseController {
 
         return "expenses";
     }
-
     @GetMapping("/filter")
     public String filterExpenses(@AuthenticationPrincipal User user,
                                  @RequestParam(required = false) Integer year,
@@ -69,13 +71,14 @@ public class ExpenseController {
         List<Expense> filteredExpenses = new ArrayList<>();
         double totalExpense = 0.0;
 
-        // Ensure current monthly and yearly totals are always available
+        // Get current month and year
         int currentYear = LocalDate.now().getYear();
         int currentMonth = LocalDate.now().getMonthValue();
+
         double currentMonthlyTotal = expenseService.getTotalExpenseByMonthAndYear(user, currentYear, currentMonth);
         double currentYearlyTotal = expenseService.getTotalExpenseByYear(user, currentYear);
 
-        // Set default values for filtered totals
+        // Initialize variables for filtered totals
         double filteredMonthlyTotal = 0.0;
         double filteredYearlyTotal = 0.0;
 
@@ -103,21 +106,28 @@ public class ExpenseController {
             filteredExpenses = expenseService.getUserExpenses(user);
         }
 
-        // Ensure the budget is included in the filtering
+        // Fetch Budget for User
         Budget budget = budgetService.getBudgetForUser(user);
         double monthlyBudget = budget != null ? budget.getMonthlyBudget() : 0.0;
         double yearlyBudget = budget != null ? budget.getYearlyBudget() : 0.0;
 
-        // ✅ Correctly calculate warnings
-        // Ensure warning calculations are based on the correct values
-        boolean monthlyWarning = monthlyBudget > 0 && (filteredMonthlyTotal > 0 ? filteredMonthlyTotal : currentMonthlyTotal) >= monthlyBudget;
-        boolean yearlyWarning = yearlyBudget > 0 && (filteredYearlyTotal > 0 ? filteredYearlyTotal : currentYearlyTotal) >= yearlyBudget;
+        // ✅ Determine which values to use for warnings (Filtered totals if available, otherwise current totals)
+        double usedMonthlyTotal = filteredMonthlyTotal > 0 ? filteredMonthlyTotal : currentMonthlyTotal;
+        double usedYearlyTotal = filteredYearlyTotal > 0 ? filteredYearlyTotal : currentYearlyTotal;
 
+        boolean monthlyWarning = monthlyBudget > 0 && usedMonthlyTotal >= monthlyBudget;
+        boolean yearlyWarning = yearlyBudget > 0 && usedYearlyTotal >= yearlyBudget;
 
+        // ✅ Handle "No expenses found" message
+        if (filteredExpenses.isEmpty()) {
+            model.addAttribute("errorMessage", "⚠️ No expenses found for the selected filters.");
+        }
+
+        // ✅ Send data to the view
         model.addAttribute("filteredExpenses", filteredExpenses);
         model.addAttribute("totalExpense", totalExpense);
-        model.addAttribute("monthlyTotal", filteredMonthlyTotal > 0 ? filteredMonthlyTotal : currentMonthlyTotal);
-        model.addAttribute("yearlyTotal", filteredYearlyTotal > 0 ? filteredYearlyTotal : currentYearlyTotal);
+        model.addAttribute("monthlyTotal", usedMonthlyTotal);
+        model.addAttribute("yearlyTotal", usedYearlyTotal);
         model.addAttribute("monthlyBudget", monthlyBudget);
         model.addAttribute("yearlyBudget", yearlyBudget);
         model.addAttribute("monthlyWarning", monthlyWarning);
@@ -125,6 +135,11 @@ public class ExpenseController {
         model.addAttribute("selectedYear", year);
         model.addAttribute("selectedMonth", month);
         model.addAttribute("selectedCategory", category);
+
+        // ✅ Pass the full month name to Thymeleaf
+        if (month != null) {
+            model.addAttribute("monthName", getMonthName(month));
+        }
 
         return "expenses";
     }

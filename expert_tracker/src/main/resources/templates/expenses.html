@@ -114,7 +114,12 @@
             <h4 class="text-center">Expense Overview</h4>
             <div class="row text-center">
                 <div class="col-md-6">
-                    <h5>Monthly Expense: <span th:text="${monthlyTotal} + ' ₹'"></span> /
+                    <h5>
+                        Monthly Expense for
+                        <span th:if="${selectedMonth != null}"
+                              th:text="${#temporals.format(#temporals.create(selectedYear, selectedMonth, 1), 'MMMM')}"></span>
+                        <span th:if="${selectedYear != null}" th:text="${selectedYear}"></span>:
+                        <span th:text="${monthlyTotal} + ' ₹'"></span> /
                         <span th:text="${monthlyBudget} + ' ₹'"></span>
                     </h5>
                     <div th:if="${monthlyWarning}" class="alert alert-danger">
@@ -123,7 +128,9 @@
                 </div>
 
                 <div class="col-md-6">
-                    <h5>Yearly Expense: <span th:text="${yearlyTotal} + ' ₹'"></span> /
+                    <h5>
+                        Yearly Expense for <span th:text="${selectedYear}"></span>:
+                        <span th:text="${yearlyTotal} + ' ₹'"></span> /
                         <span th:text="${yearlyBudget} + ' ₹'"></span>
                     </h5>
                     <div th:if="${yearlyWarning}" class="alert alert-danger">
